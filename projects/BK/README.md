@@ -1,137 +1,166 @@
 # Project BK — High-performance CPU (interview kit)
 
-Update this file as numbers land. Interview answers must use **given** facts; anything in *Assumed / typical* is only for study, not for claiming on a resume.
+Facts below come from the BK spec table. Use them in interviews. Do not invent WNS, IR, instance count, or UPF topology.
 
-## Given (use these)
+## Specs (given)
 
 | Item | Value |
 |---|---|
-| Project | BK |
+| RTL | **LAC RTL** |
 | Design | High-performance CPU |
-| Node | TSMC **N3E** (3 nm class, FinFET) |
-| Frequency target | **3.4 GHz** |
-| Area | **2.4 mm²** |
-| Cycle time | **T = 1/3.4e9 ≈ 294 ps** |
-| Characteristic size | √2.4 ≈ **1.55 mm** on a side if roughly square; ~1.5–2.2 mm of Manhattan span |
+| Frequency | **3.4 GHz** → **T ≈ 294 ps** |
+| Power goal | **NA** (not a signoff number on this sheet) |
+| Area | **2.65 mm²** → √2.65 ≈ **1.63 mm** on a side if square; ~1.6–2.3 mm Manhattan span |
+| Node / library | **TSMC N3E** (FinFET, not GAA) |
+| Cell | **H169PP54** (169 nm-class height, 54 nm poly pitch) |
+| Metal stack | **15M** `1Xa1Xb1Xc1Xd1Ya1Yb4Y2Yy2Z` + **UTRDL** + **SHDMIM** |
+| Pitches (from stack name) | M1 **P54**, M2 **P34**, M3 **P40**, M4 **P42**, M5 **P66**, M6–M11 **P76** |
+| Signal routing | **M0–M13** |
+| Clock | **H-tree on M14–M15** |
+| Vt palette | **ELVT / ULVT / ULVTLL / LVT** (no SVT/HVT on this sheet; no multi-Lg) |
+| Rails listed | **0.765 V and 0.80 V** |
 
-## Still needed (do not invent in interviews)
+### Corners on the sheet (functional)
 
-Role and ownership, instance count, util, metal stack / cell height, cache/SRAM map, clock architecture (tree vs mesh), voltage domains, MCMM/derate, WNS/TNS, IR, DFT, ECO, tapeout status, what you personally closed.
+| Use | Corner |
+|---|---|
+| Setup | `ssgnp_cworstccworstt_max_0p945v_125c` |
+| Hold | `ffgnp_cbestccbestt_min_1p05v_125c` |
+| Power | `tt_typical_max_0p75v_85c` |
 
----
-
-## 90-second interview opener (safe version)
-
-> I worked physical design on **BK**, a **high-performance CPU** at **TSMC N3E**. The block is **2.4 mm²** with a **3.4 GHz** target, so the cycle is about **294 ps**. At this node and frequency the problem is not “run the flow.” It is **closing a ~300 ps period** across a **~1.5 mm** core: **clock latency and skew eat the budget**, **BEOL RC and pin access** dominate data paths, **L1/L2 macros** decide the floorplan, and **dynamic IR plus variation (LVF)** show up as Fmax, not as a DRC. My job was to treat floorplan, CTS, and signoff as one timing/power object, not three tools.
-
-When you have ownership details, append one sentence: *I owned [floorplan / CTS / timing / IR] from [stage] through tapeout.*
-
----
-
-## What this design point actually means
-
-**294 ps is a CPU period, not a GPU/SoC period.**  
-A few tens of picoseconds of extra clock latency, SI, or IR push-out is several percent of Fmax. Interviewers will expect you to talk in **picoseconds and millivolts**, not “we optimized PPA.”
-
-**2.4 mm² is a core-class floorplan.**  
-This is a **CPU core / complex**, not a full SoC. Expect **RF/SRAM** (L1 I/D, TLB, L2 slice), **control irregularity**, and **hotspot current density**. Macro placement is the chip.
-
-**N3E is FinFET, EUV-heavy, RC- and variation-dominated.**  
-Std-cell delay is quantized (fins). Long nets lose to **wire + via**. Signoff is **POCV/LVF**, SI-aware, multi-voltage if turbo/Vmin exist. Hold at FF is as hard as setup at SS because **min paths are short** and **derate is large**.
-
-**Clock is a first-class datapath.**  
-On a 1.55 mm block at 3.4 GHz, a naive tree can spend **a large fraction of 294 ps** in insertion delay. HPC CPUs often use **mesh or hybrid mesh**, **NDR clocks on upper metal**, **useful skew**, and **tight local-skew regions** (ALU vs L1 vs L2).
-
-**Power grid is an Fmax feature.**  
-CPU current is spiky (clock edge + issue width). Dynamic drop on a clock spine or execution cluster **adds delay in the same corner you advertise 3.4 GHz**. Floorplan PG, via density, and decap are timing closure.
+Treat these as **the three named PVTs**, not as “full MCMM.” A 3.4 GHz N3E CPU almost always has more corners in the real signoff deck.
 
 ---
 
-## Floorplan stance (BK-specific)
+## 90-second opener
 
-Do **not** push L1/L2 and register-file macros to the edges by default. On BK, the critical paths are **reg–reg in the EX/INT cluster**, **reg–mem into L1**, and **L2 interface**. Edge-parking those memories **adds RC on the 294 ps budget**, **creates channels** that trap buffers, and **pulls the clock** to the perimeter. Put **pin sides toward the logic that owns Fmax**, sit macros on a **thick PG mesh**, size **explicit channels**, keep **PHY/analog/IO** on the true edge if present.
+> I did physical design on **BK**, an HPC **CPU** (**LAC RTL**) at **TSMC N3E**. The block is **2.65 mm²**, cell **H169PP54**, **3.4 GHz** so the cycle is **~294 ps**. Signal routes **M0–M13**; the clock is an **H-tree on M14–M15**. Setup I talk to is **SSGNP, CworstCCworstT, 0.945 V, 125 °C**; hold is **FFGNP, CbestCCbestT, 1.05 V, 125 °C**. The sheet lists two voltages, **0.765 V and 0.80 V**, while those timing corners are **overdrive relative to 0.80 V** — so Fmax, Vmin, and physical rails are not the same sentence. The library is all **low-Vt: ELVT, ULVT, ULVTLL, LVT**. Closure is a **294 ps** problem: **H-tree latency/skew**, **tight M2 P34 pin access**, **cache/RF macros**, and **IR on the same corner we advertise 3.4 GHz**.
+
+Add: *I owned [floorplan / CTS / STA / IR] …* when you have it.
 
 ---
 
-## Question bank (answer with BK numbers)
+## How to read this sheet (so you do not get trapped)
+
+**1. 0.765 / 0.80 vs 0.945 / 1.05 / 0.75**  
+Do **not** say “the CPU is a 0.945 V design.”  
+- **0.765 V and 0.80 V** are the **multivoltage** line — likely **two rails or two operating points** (logic vs SRAM, or two AVS points). They are only **~35 mV** apart, so ask yourself: real UPF domains with LS, or two Fmax/Vmin points on one grid?  
+- **0.945 V setup** and **1.05 V hold** are **overdrive / turbo-style** timing voltages on the functional mode.  
+- **0.75 V typical power** sits next to the **0.765 V** rail — leakage/dynamic at a **low-V typical**, not at the 3.4 GHz corner.
+
+One-liner: *3.4 GHz is an Fmax claim at high-V SS 0.945 V; power is quoted (when it exists) near 0.75 V TT; the chip still has 0.765/0.80 in the power intent.*
+
+**2. Hold at 125 °C, not −40 °C**  
+The sheet’s hold PVT is **FF, Cbest, 1.05 V, 125 °C**. Cold-min is often worse for hold. If asked: *This table shows one hold corner at 125 °C. I would still expect a cold hold in a real N3E deck; I would not tell a hiring panel that hold-at-hot is the only hold.*
+
+**3. H-tree, not mesh**  
+BK **specifies H-tree on M14–M15**. Do not say “we used a mesh” unless you later did. Thick top metals: **low RC, shielding, NDR, via stack from M15 down to sinks**.
+
+**4. All low-Vt, power goal NA**  
+No SVT/HVT on the sheet. **ELVT** is for the 294 ps cone; **ULVTLL / LVT** are the leakage knobs you still have. Power is **unbounded on this table** — interviewers will ask how you stopped ELVT from eating the rail.
+
+**5. M2 P34**  
+Tightest listed pitch. **Pin access, M2 coloring, via pillars, congestion** live here. Upper **P76 (M6–M11)** is where **long data and PG** want to go; **M14–M15** are **clock**.
+
+**6. SHDMIM + UTRDL**  
+**SHDMIM**: MIM decap in the stack — IR/dv/dt, not a DRC curiosity. **UTRDL**: thick RDL for **C4/bump / coarse PG** into 2.65 mm².
+
+---
+
+## Question bank
 
 ### Q1. Walk me through BK.
 
-**A.** BK is an HPC **CPU** at **N3E**, **2.4 mm²**, **3.4 GHz → 294 ps**. Span is ~1.55 mm. Closure is a **period problem**: clock, data RC, variation, and IR share one budget. Floorplan is cache/RF macros + EX datapath. CTS must keep **skew and latency** from eating Fmax. Signoff is MCMM + SI + LVF. *(Then: your role, one hard close.)*
+**A.** HPC CPU, **LAC RTL**, **N3E**, **2.65 mm²**, **H169PP54**, **3.4 GHz / 294 ps**. **15M** stack, route **M0–M13**, **H-tree M14–M15**. Setup **SS 0.945 V 125 °C CworstCCworstT**; hold **FF 1.05 V 125 °C CbestCCbestT**; power **TT 0.75 V 85 °C**. Vt **ELVT–LVT**. Rails **0.765 V and 0.80 V**. I close **period + H-tree + pin access + IR**, not a generic PPA loop.
 
-### Q2. Why is 3.4 GHz on 2.4 mm² hard at N3E?
+### Q2. Why is this hard?
 
-**A.** Because **T ≈ 294 ps** while **Manhattan span ~1.5 mm**. Wire delay, via stack, clock insertion, OCV/LVF, SI, and IR-induced push-out are the same order as **a few FO4**. You cannot “buffer out of it” without power and min-path hold. N3E libraries are fast but **BEOL and variation** set Fmax. Utilization looks fine while **pin access and cache ports** kill the period.
+**A.** **294 ps** vs **~1.63 mm** span. H-tree insertion delay, via stack from M15, M2 P34 access, SI, LVF, and IR push-out are **percent-of-Fmax**, not rounding error. ELVT gets you delay and **leakage/IR**. Power goal NA means **nobody gave you a watt number to hide behind**.
 
-### Q3. What is your timing budget sketch?
+### Q3. Timing budget on the whiteboard.
 
-**A.** (Whiteboard.)  
-`Tck ≥ Tclk_q + Tpd + Tsu + clock_skew_effective + uncertainty + SI + IR_pushout + variation`.  
-With Tck = 294 ps, if launch/capture clock **mismatch + uncertainty** is 20–40 ps and **Tsu** is ~10–20 ps, **combinational+wire** must fit in **~230–260 ps** before derate. That is why **useful skew**, **layer assignment**, and **not detouring around macros** matter. I would not quote a fake FO4 count unless I measured it on BK.
+**A.**  
+`294 ps ≥ Tcq + Tpd + Tsu + skew_eff + uncertainty + SI + IR_pushout + variation`  
+Clock is an **H-tree on M14–M15**: latency is global, **local skew** at the leaf still kills bypass paths. I would not quote FO4 unless I measured it on LAC.
 
-### Q4. Tree, mesh, or hybrid for BK?
+### Q4. Why H-tree on M14–M15? Why not a mesh?
 
-**A.** At **3.4 GHz** on **~1.5 mm**, a **pure tree** often loses on **global skew and latency variation** across PVT. A **clock mesh** (or **hybrid: mesh over EX/L1, tree to quieter blocks**) buys **low skew** at the cost of **power and EM** on the mesh drivers. Decision: **skew sensitivity of the 294 ps paths** vs **clock power / IR**. I would CTS-prototype both on the real floorplan, not pick from a slide.
+**A.** Spec **chose H-tree** on the **two thickest metals**: low resistance, dedicated clock, shielding, predictable trunk. A mesh at 3.4 GHz is a **power/EM** tax. With **2.65 mm²**, a balanced H-tree can hit **skew** if trunks stay on M14–M15 and **taps/via farms** are planned. I still CTS for **local skew in EX/L1**, not only global H-tree skew. I would not claim mesh unless the flow added a leaf mesh.
 
-### Q5. Where do you put L1 and L2?
+### Q5. Decode the metal stack in 45 seconds.
 
-**A.** **L1** next to the pipes that use it (load/store, I-side fetch), **pin side inward**, **channel sized to port pitch**, **on strong PG** (fill + via). **L2** on the back of the core or a banked side **with a data spine**, not a wall on the pad edge unless the bus leaves the CPU there. Edge is for **cluster interface / debug / analog**, not for burying D-cache ports.
+**A.** **15 metals**: Xa–Xd / Ya–Yb / 4Y / 2Yy / 2Z + **UTRDL**. Pitches tighten at **M2 P34**, then open to **P76** from M6. **M0–M13** take signal; **M14–M15** are **H-tree**. **SHDMIM** is on-die decap. PG: **fine straps on mid layers, coarse on Y/Z/RDL**. I do not dump long data on M2.
 
-### Q6. Setup is green in PnR, Fmax is 3.1 GHz at signoff. Debug order?
+### Q6. What does H169PP54 mean for you?
 
-**A.** (1) **Which corner/mode** — turbo vs Vmin, setup vs hold. (2) **Clock** — latency, local skew, generated clocks, ICG enable. (3) **Constraint quality** — false/MCYC/CDC. (4) **Parasitics + SI** — SPEF vs extract, coupling on EX loops. (5) **LVF/POCV vs PnR derate**. (6) **IR annotated delay**. (7) **Path class** — mem vs ALU vs bypass. Do not start with global upsizing; **294 ps** dies from **clock and exceptions** first.
+**A.** **169 nm-class** height and **54 nm** poly pitch: **track count, pin access, fin quantization, M1 P54 alignment**. Taller/HP cells help 3.4 GHz and **hurt density and leakage**. Floorplan util and **M2 congestion** must assume this cell, not a dense 7.5T-style library.
 
-### Q7. Hold at 3 nm / 3.4 GHz?
+### Q7. Setup 0.945 V but multivoltage 0.765 / 0.80. Explain.
 
-**A.** High-performance cells + **short EX bypass** + **useful skew** + **FF/low-temp min** + **SI speedup** + **LVF** → hold is a **tapeout item**, not a cleanup. Scan shift/capture hold is a second chip. Fix: **data delay on true min paths**, **clock skew control**, **not** random delay cells on everything (power, setup). Filler/decap and metal fill can **move hold** after you thought you were done.
+**A.** Different questions. **0.765 / 0.80** are **intent/rails or operating points**. **0.945 V SS max** is the **setup timing** voltage for the **3.4 GHz** functional corner — **overdrive vs 0.80 V**. I would map: which rail is the CPU logic, which is SRAM/array, whether LS sit on that 35 mV gap, and **whether 3.4 GHz is required at 0.80 V or only at 0.945 V**. Saying “Fmax at 0.765 V is 3.4 GHz” is almost certainly wrong.
 
-### Q8. IR and 3.4 GHz?
+### Q8. Hold corner: FF 1.05 V 125 °C. What is odd?
 
-**A.** CPU **di/dt** at the clock edge. Dynamic drop on the **mesh or ALU row** adds **delay in the 294 ps path** and can **starve SRAM wordline**. Static IR from macro PG holes is the floorplan bug. I would co-design **strap pitch, via pillars, decap, and CTS** and sign off with **vectors that toggle EX + L1**, not only vectorless.
+**A.** **High-V FF Cbest** is the right **RC and device** direction for hold. **125 °C** is **not** the usual cold hold. Device vs interconnect temp can go either way at N3E; I still ask CAD for **cold hold**. Hold at **1.05 V** with **ELVT** and **short LAC bypass** is the real risk. Scan hold is a second mode **not on this table**.
 
-### Q9. Congestion vs Fmax — which do you give?
+### Q9. CworstCCworstT vs CbestCCbestT?
 
-**A.** On BK, **a clean route that detours the ALU–L1 net is a frequency fail**. I would **open a channel, move a macro, or pad a hotspot** rather than detour a 3.4 GHz loop. Congestion 0.95 in a **non-critical** corner can wait. Congestion on **EX bypass / cache fill** cannot.
+**A.** **Cworst + CCworstT**: high interconnect RC + coupling in the **slow** direction — **setup**. **Cbest + CCbestT**: low RC, coupling in the **fast** direction — **hold**. At 3.4 GHz I close **both with SI**, not Cworst-only in PnR and surprise at signoff.
 
-### Q10. Multi-Vt / multi-channel at N3E?
+### Q10. Vt strategy with no SVT/HVT.
 
-**A.** **ULVT/LVT** in the 3.4 GHz cone, **SVT/HVT** on non-critical and min-path-safe control, **leakage vs Fmax** at the turbo corner. Fin count / drive is quantized — **sizing is discrete**. VT-swap is an ECO tool; **wrong VT on a hold path** is a respins.
+**A.** Palette is **ELVT / ULVT / ULVTLL / LVT** only. **ELVT** on the 294 ps cone; **ULVTLL/LVT** everywhere the path can afford. No HVT leakage floor. **Power NA** + **ELVT** + **0.945 V** is an **IR and leakage** problem. Wrong ELVT on a **min path** blows **hold at 1.05 V**.
 
-### Q11. What does N3E change vs 7/5 nm PD?
+### Q11. Two voltages 35 mV apart. Level shifters?
 
-**A.** More **EUV**, tighter **pin access**, **via/metal resistance** more of the path, **LVF** expected at signoff, **cell height / track** choices lock routing. Same CTS/STA story, **smaller absolute slack**. A 20 ps mistake was a warning at 2 GHz; here it is **~7% of the period**.
+**A.** If they are **true simultaneous rails**, yes: **LS, isolation, UPF**, even at 35 mV (noise, IR, spec). If they are **two AVS / bin points** on one rail, **no LS**, but **libs, derate, and PG** still change. I would not invent LS count. I would ask for the **UPF**.
 
-### Q12. Hierarchical or flat on 2.4 mm²?
+### Q12. Macros / L1 — still not on the edge by default.
 
-**A.** A **2.4 mm² CPU** is often **flat or one-level** (core) with **cluster top** above. Hierarchical only if CAD/instance count or IP (L2, debug) forces it. Budgets at 294 ps are **dangerous** — ILM/ETM error is Fmax. If hierarchical, **pin timing and clock** are the contract, not area.
+**A.** **294 ps** does not pay for a **cache-port detour**. Pin side to the pipe, channel for **P34/M2 access**, macros on **PG + MIM**. Edge is for **cluster IO**, not a pretty SRAM ring. H-tree trunks on M14–M15 still need **vertical taps**; a macro wall **breaks tap/via farms**.
 
-### Q13. DFT at this frequency?
+### Q13. IR on this stack.
 
-**A.** OCC, scan **shift much slower than 3.4 GHz**, **capture** may still stress **hold**. Lockup latches, compression, and **memory BIST** around L1/L2 must not **wreck functional CTS**. I keep **scan exceptions honest** and close **shift/capture as real modes**, not leftover.
+**A.** CPU **di/dt** at 3.4 GHz. **UTRDL + Z/Yy** carry current; **SHDMIM** and filler decap hold the edge. Voltage drop at **0.945 V SS** is **delay** on the 294 ps path; drop at **0.765 V** is **function / SRAM**. I would not size PG only from the TT 0.75 V power corner.
 
-### Q14. Late ECO, 3.4 GHz, N3E — metal-only?
+### Q14. Congestion vs Fmax.
 
-**A.** Metal-only can **buffer, layer-assign, some VT if spare**, not **rewrite an ALU path**. Spare cells must sit in **EX and cache-port channels**, not only in leftover corners. If the period is already packed, **base-layer ECO or RTL pipeline** is the honest answer.
+**A.** **M2 P34** hotspots at **RF/L1 ports** vs **H-tree blockage on M14–M15**. I will **move a macro or pad** before I detour an EX net onto extra vias. Overflow in a non-critical corner is cheaper than **20 ps** on LAC.
 
-### Q15. Behavioral: what would you not do on BK?
+### Q15. Power corner TT 0.75 V 85 °C vs Fmax.
 
-**A.** (Fill with your story.) Template: *I would not freeze a pretty macro ring before a 3.4 GHz path-group map. I would not CTS to a skew target that ignores LVF and IR. I would not waive a path I cannot defend with RTL.*
+**A.** That corner is **typical energy/leakage**, not 3.4 GHz. Switching at **turbo 0.945–1.05 V** is a **different current**. Power goal **NA** means I still need a **current map for IR**, even without a watt target.
+
+### Q16. What is missing from this sheet that you would still sign off?
+
+**A.** Full **MCMM** (including **Vmin setup**, **cold hold**, **scan shift/capture**), **SI on/off**, **derate/LVF**, **SPEF vs extraction**, **IR/EM vectors**, **UPF**, **clock uncertainty vs H-tree spec**, **DFT**, **DRC/LVS**, **ECO/spares**. I would not tape out from three PVT bullets.
+
+### Q17. Behavioral: what would you not do?
+
+**A.** Template: *I would not treat 0.945 V setup as the only voltage in the design. I would not CTS an H-tree on M14–M15 without a via/tap plan through the 15M stack. I would not flood ELVT because power is NA. I would not waive LAC paths I cannot defend.*
 
 ---
 
-## Whiteboard drills (BK)
+## Whiteboard drills
 
-1. Draw **294 ps** setup/hold with launch/capture, OCV arrows, and 20 ps IR push-out.  
-2. Sketch **2.4 mm²** core: L1I, L1D, RF, EX, L2 interface, clock spine/mesh, PG straps.  
-3. Show **why L1D on the far edge** adds RC the period cannot afford.  
-4. List **signoff corners** you would demand for a 3.4 GHz claim (even if you do not have the exact list yet).
+1. **294 ps** setup at **0.945 V SS Cworst** and hold at **1.05 V FF Cbest**, with H-tree launch/capture on **M14–M15**.  
+2. Layer map: **M2 P34** pins, **M6–M11 P76** data/PG, **M14–M15** H-tree, **UTRDL** bumps.  
+3. Two boxes: **rails 0.765/0.80** vs **timing 0.945/1.05** vs **power 0.75**.  
+4. Macro + H-tree tap: why an edge SRAM ring **breaks clock vias and cache timing**.
 
 ---
 
-## Trap list (do not say)
+## Trap list
 
-- Exact WNS/TNS, instance count, metal stack, or “we signed off LVF” until you have it.  
-- “N3E is GAA” — **N3E is FinFET**; GAA is the next family (e.g. N2).  
-- “2.4 mm² is the whole SoC.” It is **core-class**.  
-- “3.4 GHz at all voltages.” Likely **turbo / high-V**; **Vmin Fmax** is a different number.  
-- Command dumps (Innovus/ICC2) instead of **period, skew, IR, macros**.
+- **N3E is GAA** — false; FinFET.  
+- **3.4 GHz at 0.765 V** — not what the setup corner says.  
+- **Mesh** — sheet says **H-tree M14–M15**.  
+- **SVT/HVT leakage recovery** — not on the Vt list.  
+- **Hold only needs this 125 °C corner** — incomplete.  
+- **2.65 mm² is the SoC** — core-class.  
+- **Power NA means IR does not matter.**  
+- Invented WNS/TNS, util, or UPF.
+
+## Still needed from you
+
+Role/ownership, instance count, util, SRAM/RF map, UPF (are 0.765/0.80 two rails?), full MCMM, derate, WNS/TNS, IR, DFT, ECO, what you closed.
