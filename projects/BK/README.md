@@ -1,6 +1,8 @@
 # Project BK — High-performance CPU (interview kit)
 
-Facts below come from the BK spec table. Use them in interviews. Do not invent WNS, IR, instance count, or UPF topology.
+Facts below come from the BK **core (LAC)** spec table. Use them in interviews. Do not invent WNS, IR, instance count, or UPF topology.
+
+**L3 is a separate block you owned RTL → GDS.** Do not paste 3.4 GHz / 2.65 mm² onto L3 until L3 specs are dumped. Study kit: [L3_RTL_to_GDS.md](L3_RTL_to_GDS.md).
 
 ## Specs (given)
 
