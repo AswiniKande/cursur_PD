@@ -9,6 +9,7 @@ You owned **L3CtlClone** from **RTL to GDS**. Use **only** dumped facts in inter
 | Item | Value |
 |---|---|
 | Block | **L3CtlClone** |
+| Node | **N7** (7 nm FinFET) |
 | Meaning (say this, don’t invent more) | **L3 control, cloned instance** — control/pipeline around L3, a **replicated** PD block, not “the whole SRAM cache” unless you later say it included arrays |
 | Operating corners | **ttop**, **ttop9v**, **tt1p2v** |
 
@@ -18,19 +19,21 @@ You owned **L3CtlClone** from **RTL to GDS**. Use **only** dumped facts in inter
 |---|---|---|
 | **ttop** | **TT**, typical process, **operating-point** voltage (nominal “op”) | Exact volts until you dump them |
 | **ttop9v** | **TT at 0.9 V** | That 0.9 V is Vmin or Fmax |
-| **tt1p2v** | **TT at 1.2 V** | That this is N3E (1.2 V is a **high** rail vs BK core 0.76–0.95 V) |
+| **tt1p2v** | **TT at 1.2 V** | That 1.2 V is a typical **N7 core-only** rail without a dual-rail/IO story |
 
 All three names are **TT** (typical-typical). That is an **implementation / power-typical** set, not a full **SS setup + FF hold** foundry deck. Interviewers will ask: *where did SS/FF live?*
 
-**1.2 V vs 0.9 V** on the same block ⇒ **multi-voltage or multi-mode**: overdrive vs nom, logic vs analog/IO, or two operating bins. You have **not** said which. Do not invent UPF.
+**N7 + 0.9 V + 1.2 V:** 0.9 V is a plausible **N7 logic** operating point. **1.2 V** is **high** for 7 nm core FinFET — treat as a **second rail or high-voltage mode** until you dump UPF (always-on, IO, analog, SRAM, overdrive). Do not invent which.
+
+This block is **N7**, not the BK **N3E** LAC core. Two projects/nodes if both appear on the resume.
 
 ---
 
 ## 90-second opener (current facts only)
 
-> I owned **L3CtlClone** from **RTL to GDS**. It is the **L3 control clone** — a replicated control block in the L3 hierarchy, not a slogan for “I placed SRAMs.” I implemented and signed the block at three **typical** operating corners: **ttop** (TT operating point), **ttop9v** (TT **0.9 V**), and **tt1p2v** (TT **1.2 V**). So the PD problem is **one netlist across two voltages (0.9 V and 1.2 V) plus a nominal TT op corner**: cell delay, constraints, and IR change with rail; clone means **floorplan, pin, and clock must be repeatable**. I do not call ttop/ttop9v/tt1p2v a full SS/FF signoff deck — those were the **operating corners I was given for this block**.
+> I owned **L3CtlClone** from **RTL to GDS** in **N7**. It is the **L3 control clone** — a replicated control block in the L3 hierarchy. I implemented it at three **TT** operating corners: **ttop**, **ttop9v** (TT **0.9 V**), and **tt1p2v** (TT **1.2 V**). At 7 nm that means **one netlist across a 0.9 V logic-like point and a 1.2 V high rail**, plus nominal ttop: delay, hold, and IR all move with voltage. Clone means **floorplan, pins, and timing budget must be repeatable**. These were the **block operating corners**, not a full SS/FF foundry deck. This is **N7**, not the N3E 3.4 GHz core.
 
-Add node, frequency, area, arrays, and challenges when dumped.
+Add frequency, area, arrays, ttop voltage, and challenges when dumped.
 
 ---
 
@@ -38,16 +41,17 @@ Add node, frequency, area, arrays, and challenges when dumped.
 
 You owned this block **from RTL to GDS**. That is a **full-chip-quality** story: constraints, netlist, floorplan, clocks, memories, STA, IR, PV, GDS. Do not reduce it to “I ran Innovus.”
 
-**BK CPU spec (LAC, 3.4 GHz, 2.65 mm²) is the core sheet — not automatically L3CtlClone.** Do **not claim 3.4 GHz or N3E** on L3CtlClone until you dump them.
+**BK CPU spec (LAC, 3.4 GHz, 2.65 mm², N3E) is a different sheet.** L3CtlClone is **N7**. Do not claim 3.4 GHz or N3E on L3CtlClone.
 
 ## Still needed (dump when ready)
 
 ```text
 L3CtlClone RAW
-- Node / foundry / metal stack / cell:
+- Foundry / metal stack / cell height:
 - Area, util, instances, macros (control-only vs SRAMs):
 - Frequency; why a clone (how many copies, top-level):
-- What ttop voltage actually is (e.g. 1.0 V?):
+- What ttop voltage actually is:
+- What 1.2 V supplies (core overdrive vs SRAM vs IO vs AON):
 - SS/FF / hold corners if any beyond ttop, ttop9v, tt1p2v:
 - Challenges (one at a time):
 ```
@@ -195,9 +199,13 @@ Interview sentence: *On L3 I optimized **array assembly and data-spine RC**. On 
 - **ttop**: **power/typical delay** and the corner you quote to architecture.  
 Sizing that fixes 0.9 V setup **hurts 1.2 V hold**. That is the **Vt/size** loop on this block.
 
-### Q7. Is 1.2 V compatible with BK N3E core voltages?
+### Q7. N7 with 0.9 V and 1.2 V — explain.
 
-**A.** **Not unless this is a different rail or a different node.** BK core sheet is **0.765 / 0.80** with timing at **0.945 / 1.05**. **1.2 V** is a **different story** (older node, IO/analog, or a dedicated high rail). I will not say L3CtlClone is N3E 3.4 GHz until the spec says so.
+**A.** **L3CtlClone is N7, 7 nm FinFET.** **ttop9v** is TT **0.9 V** — a normal **N7 logic-class** voltage. **tt1p2v** is TT **1.2 V** — **high** for 7 nm core; I treat it as a **second operating voltage or rail** (I do not invent IO vs SRAM vs overdrive). Same GDS, two voltages: **0.9 V setup/IR**, **1.2 V hold/EM/leak**. This is **not** the N3E BK core (0.765/0.80, 0.945 setup).
+
+### Q7b. What does N7 change in PD vs planar / vs N3E?
+
+**A.** **N7:** FinFET (quantized width), **multi-patterning** on lower metals, BEOL RC starts to dominate, Vt flavors, pin access. **Vs N3E (other project):** N3E is **more EUV, tighter pitch, LVF, 3.4 GHz / 294 ps core**. I will not mix metal stacks, cells, or frequencies across the two. On **L3CtlClone** I talk **N7 + clone + ttop/0.9/1.2**.
 
 ### Q8. MCMM for a clone?
 
@@ -239,12 +247,13 @@ Sizing that fixes 0.9 V setup **hurts 1.2 V hold**. That is the **Vt/size** loop
 
 ## Trap list (L3)
 
-- Claiming **3.4 GHz** on L3 without a spec.  
+- Claiming **N3E / 3.4 GHz** on **L3CtlClone** — this block is **N7**.  
+- Calling **ttop9v / tt1p2v** an SS/FF deck.  
+- Saying **1.2 V is a normal N7 core-only VDD** without a rail story.  
 - “L3 is easy because it is slower / full of macros.”  
 - Pushing **all** arrays to the edge.  
 - Ignoring **MBIST mux** in functional timing.  
 - CTS **over SRAM tops**.  
-- **Power NA** ⇒ no IR.  
 - **GDS** = “Calibre was green” with no **abstract vs layout** story.
 
 ---
