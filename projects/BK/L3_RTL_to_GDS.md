@@ -1,31 +1,56 @@
+# L3CtlClone — RTL → GDS interview kit
+
+You owned **L3CtlClone** from **RTL to GDS**. Use **only** dumped facts in interviews.
+
+**Do not mix** the BK LAC core sheet (N3E, 3.4 GHz, 2.65 mm², 0.945 V SS) into L3CtlClone unless you state it is the same chip/node.
+
+## Given
+
+| Item | Value |
+|---|---|
+| Block | **L3CtlClone** |
+| Meaning (say this, don’t invent more) | **L3 control, cloned instance** — control/pipeline around L3, a **replicated** PD block, not “the whole SRAM cache” unless you later say it included arrays |
+| Operating corners | **ttop**, **ttop9v**, **tt1p2v** |
+
+### How to read the corners (from the names only)
+
+| Corner | What you can defend | What you must not claim |
+|---|---|---|
+| **ttop** | **TT**, typical process, **operating-point** voltage (nominal “op”) | Exact volts until you dump them |
+| **ttop9v** | **TT at 0.9 V** | That 0.9 V is Vmin or Fmax |
+| **tt1p2v** | **TT at 1.2 V** | That this is N3E (1.2 V is a **high** rail vs BK core 0.76–0.95 V) |
+
+All three names are **TT** (typical-typical). That is an **implementation / power-typical** set, not a full **SS setup + FF hold** foundry deck. Interviewers will ask: *where did SS/FF live?*
+
+**1.2 V vs 0.9 V** on the same block ⇒ **multi-voltage or multi-mode**: overdrive vs nom, logic vs analog/IO, or two operating bins. You have **not** said which. Do not invent UPF.
+
+---
+
+## 90-second opener (current facts only)
+
+> I owned **L3CtlClone** from **RTL to GDS**. It is the **L3 control clone** — a replicated control block in the L3 hierarchy, not a slogan for “I placed SRAMs.” I implemented and signed the block at three **typical** operating corners: **ttop** (TT operating point), **ttop9v** (TT **0.9 V**), and **tt1p2v** (TT **1.2 V**). So the PD problem is **one netlist across two voltages (0.9 V and 1.2 V) plus a nominal TT op corner**: cell delay, constraints, and IR change with rail; clone means **floorplan, pin, and clock must be repeatable**. I do not call ttop/ttop9v/tt1p2v a full SS/FF signoff deck — those were the **operating corners I was given for this block**.
+
+Add node, frequency, area, arrays, and challenges when dumped.
+
+---
+
 # Project BK — L3 cache PD (RTL → GDS)
 
 You owned this block **from RTL to GDS**. That is a **full-chip-quality** story: constraints, netlist, floorplan, clocks, memories, STA, IR, PV, GDS. Do not reduce it to “I ran Innovus.”
 
-**BK CPU spec (LAC, 3.4 GHz, 2.65 mm²) is the core sheet — not automatically L3.** L3 is usually a **different period, area, and macro ratio**. Use L3 numbers only when you dump them. Until then, say *L3 on the same N3E / H169 / 15M / H-tree stack unless I tell you otherwise* — and **do not claim 3.4 GHz on L3**.
+**BK CPU spec (LAC, 3.4 GHz, 2.65 mm²) is the core sheet — not automatically L3CtlClone.** Do **not claim 3.4 GHz or N3E** on L3CtlClone until you dump them.
 
 ## Still needed (dump when ready)
 
 ```text
-L3 RAW
-- L3 size (MB) / ways / banks / slices:
-- Area, util, instance count, SRAM count & compiler:
-- L3 clock vs core 3.4 GHz (1:1, /2, uncore):
-- Same UPF 0.765/0.80? SRAM voltage?
-- Your exact ownership (synth? DFT? all PnR? signoff? GDS merge?):
-- Floorplan style (abutted banks, channels, spine):
-- WNS/TNS setup/hold, worst path class (tag, data, fill/evict, APB/CSR):
-- MBIST / repair / redundancy / wrapper:
-- IR, EM, DRC war, ECO, tapeout:
+L3CtlClone RAW
+- Node / foundry / metal stack / cell:
+- Area, util, instances, macros (control-only vs SRAMs):
+- Frequency; why a clone (how many copies, top-level):
+- What ttop voltage actually is (e.g. 1.0 V?):
+- SS/FF / hold corners if any beyond ttop, ttop9v, tt1p2v:
+- Challenges (one at a time):
 ```
-
----
-
-## 90-second opener (ownership)
-
-> I owned **L3 cache physical design from RTL to GDS** on the BK CPU program at **TSMC N3E**. L3 is a **memory-dominated** block: the floorplan **is** the SRAM banks, not a sea of std cells with a few macros. I took **RTL + SDC + SRAM views** through **synthesis, DFT/MBIST-aware netlist, floorplan, place, H-tree CTS, route, SI-aware STA, IR/EM, DRC/LVS, and GDS**. Critical paths are **tag/data array access, fill/evict buses, and control**, not an ALU FO4 loop. I placed arrays for **port access, banking channels, repair/BIST, and PG**, not a pretty ring on the die edge. Signoff was the same **N3E** discipline: **MCMM, hold on min paths through wrappers, H-tree taps through 15M, MIM/RDL IR**.
-
-When you have freq/area: insert *L3 ran at [X] GHz in [Y] mm² with [N] SRAMs.*
 
 ---
 
@@ -137,6 +162,54 @@ Interview sentence: *On L3 I optimized **array assembly and data-spine RC**. On 
 
 **Q. Metal-only on L3?**  
 **A.** Can fix **spine buffers, layer, some hold**. Cannot **move an SRAM** or **add a pipe stage**. Spares in **controller and channels**, not on **array tops**. Late timing on **tag 1-cycle** often needs **RTL**.
+
+---
+
+## L3CtlClone — Q&A from given corners
+
+### Q1. What was the block?
+
+**A.** **L3CtlClone**: L3 **control** path, **cloned** (replicated) in physical hierarchy. I owned it **RTL to GDS**. Clone means **identical abstract, pins, PG, clock, and timing budget** for every copy — a **methodology** problem, not only a PPA problem.
+
+### Q2. What does “Clone” change in PD?
+
+**A.** Floorplan and **pin order** must **abut or feed through** the same way at top. You cannot “nudge one macro for timing” on copy A and leave copy B. **CTS latency** and **boundary budgets** are contracts. A late ECO must be **clone-legal** or you **break identical abstracts**.
+
+### Q3. Why is it Ctl, not the whole L3?
+
+**A.** Control is **std-cell heavy** (request pipe, hit/miss, queues, CSR) sitting **next to arrays** that may live in another partition. Timing is **control-to-array pins** and **clone-to-fabric**. If arrays were not in this block, I will say so when I dump macros — I will not claim I compiled the L3 SRAMs unless I did.
+
+### Q4. Explain ttop, ttop9v, tt1p2v.
+
+**A.** Three **TT** operating corners: **nominal op**, **0.9 V**, **1.2 V**. I used them as the **block operating set**. **0.9 V** is the **slow-TT** delay/IR stress among these three; **1.2 V** is **fast-TT** (hold, leak, EM, short-path). **ttop** is the **intended typical**. I timed **the same GDS** into all three, not three different netlists.
+
+### Q5. Only TT — is that signoff?
+
+**A.** Honest answer: **those were the operating corners for L3CtlClone.** Full CMOS signoff is usually **SS setup + FF hold + RC corners + SI**. If the program timed clones at TT only, I say that and I know the **risk**: TT hides **setup at SS** and **hold at FF**. If SS/FF were at top-level, I say **block vs chip** signoff. I do **not** pretend ttop9v is SSGNP.
+
+### Q6. 0.9 V and 1.2 V on one control block. What do you close?
+
+**A.**  
+- **0.9 V TT**: **setup**, drive, **IR drop → delay**, max-tran/cap.  
+- **1.2 V TT**: **hold**, min-pulse, **leakage**, **EM**, SI speedup.  
+- **ttop**: **power/typical delay** and the corner you quote to architecture.  
+Sizing that fixes 0.9 V setup **hurts 1.2 V hold**. That is the **Vt/size** loop on this block.
+
+### Q7. Is 1.2 V compatible with BK N3E core voltages?
+
+**A.** **Not unless this is a different rail or a different node.** BK core sheet is **0.765 / 0.80** with timing at **0.945 / 1.05**. **1.2 V** is a **different story** (older node, IO/analog, or a dedicated high rail). I will not say L3CtlClone is N3E 3.4 GHz until the spec says so.
+
+### Q8. MCMM for a clone?
+
+**A.** Modes: **functional, scan, maybe BIST**. Corners: **ttop / ttop9v / tt1p2v**. Constraints must **not** be corner-specific hacks that make **0.9 V green** and **1.2 V** a waiver mess. Clone abstracts: **ILM/ETM or .lib** generated **per corner**.
+
+### Q9. IR at these corners?
+
+**A.** **IR% at 0.9 V** is worse for **function and delay**. **Current at 1.2 V** is worse for **EM and overshoot**. I would not size PG only at ttop.
+
+### Q10. Trap question: “So you signed off typical only?”
+
+**A.** *I implemented L3CtlClone at the three TT operating corners specified for that block: ttop, 0.9 V, and 1.2 V. That covers **voltage-mode typical**. I can discuss what was done at **top-level SS/FF** or **why the methodology used TT** — I will not rebrand TT as SS.*
 
 ---
 
