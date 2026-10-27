@@ -41,6 +41,35 @@ proc ::fc::stdin_is_tty {} {
   return 1
 }
 
+proc ::fc::stdout_is_tty {} {
+  if {[catch {exec /usr/bin/test -t 1 <@stdout}]} {
+    return 0
+  }
+  return 1
+}
+
+proc ::fc::set_terminal_theme {} {
+  variable theme_active
+  if {![::fc::stdout_is_tty]} {
+    set theme_active 0
+    return
+  }
+  # Black background, white text, then clear so the whole screen picks it up.
+  puts -nonewline "\033\[0;40;97m\033\[2J\033\[H"
+  flush stdout
+  set theme_active 1
+}
+
+proc ::fc::reset_terminal_theme {} {
+  variable theme_active
+  if {![info exists theme_active] || !$theme_active} {
+    return
+  }
+  puts -nonewline "\033\[0m"
+  flush stdout
+  set theme_active 0
+}
+
 proc ::fc::banner {} {
   puts "============================================================"
   puts " fc_shell practice platform  ($::fc::version)"
@@ -81,6 +110,7 @@ proc ::fc::history_get {spec} {
 
 proc ::fc::repl {} {
   variable hist
+  ::fc::set_terminal_theme
   ::fc::banner
   set buf ""
   while {1} {
@@ -108,6 +138,7 @@ proc ::fc::repl {} {
     ::fc::eval_script $script interactive
   }
   puts ""
+  ::fc::reset_terminal_theme
 }
 
 proc ::fc::usage {} {
