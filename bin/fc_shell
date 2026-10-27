@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Practice Fusion Compiler shell. Not Synopsys fc_shell.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# rlwrap refuses a terminal whose width is 0, so fall back to plain tclsh.
+size="$(stty size 2>/dev/null || echo "24 80")"
+cols="${size##* }"
+if [[ -t 0 && -t 1 && "$cols" != "0" ]] && command -v rlwrap >/dev/null 2>&1 && [[ -z "${FC_SHELL_NO_RLWRAP:-}" ]]; then
+  exec rlwrap -n -C fc_shell -f "$ROOT/lib/completions.txt" -H "${HOME}/.fc_shell_practice_history" -- \
+    tclsh "$ROOT/lib/main.tcl" "$@"
+fi
+exec tclsh "$ROOT/lib/main.tcl" "$@"

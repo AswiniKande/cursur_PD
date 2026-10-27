@@ -1,0 +1,14 @@
+# Practice standard-cell library (not a Liberty file).
+# area is um^2, leakage is mw. seq marks edge-triggered cells.
+# Every leaf also receives implicit PG pins VDD (power) and VSS (ground).
+library std
+cell INV    area 1.0 leakage 0.020 seq false pins {A in Y out}
+cell BUF    area 1.2 leakage 0.022 seq false pins {A in Y out}
+cell CLKBUF area 1.6 leakage 0.030 seq false pins {A in Y out}
+cell NAND2  area 1.4 leakage 0.028 seq false pins {A in B in Y out}
+cell NOR2   area 1.4 leakage 0.028 seq false pins {A in B in Y out}
+cell AND2   area 1.8 leakage 0.034 seq false pins {A in B in Y out}
+cell OR2    area 1.8 leakage 0.034 seq false pins {A in B in Y out}
+cell MUX2   area 2.2 leakage 0.040 seq false pins {A in B in S in Y out}
+cell DFF    area 4.5 leakage 0.090 seq true  pins {D in CK in Q out QN out}
+cell DFFR   area 5.0 leakage 0.100 seq true  pins {D in CK in RSTN in Q out QN out}
