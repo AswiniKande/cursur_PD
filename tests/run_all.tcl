@@ -214,6 +214,19 @@ check redirect_and_filter {
   puts TEST_OK
 }
 
+# Logging is on unless -no_log is passed, and the log header calls `clock format`,
+# which autoloads Tcl's package handler.
+set code [catch {exec $shell -x {practice_labs} 2>@1} out]
+file delete -force [file join $root fc_shell_command.log]
+if {$code || ![regexp {Shell fundamentals} $out] || ![regexp {A flow procedure} $out]} {
+  incr failures
+  puts "FAIL practice_labs with command log"
+  puts $out
+} else {
+  incr passed
+  puts "PASS practice_labs with command log"
+}
+
 puts "labs:"
 foreach n {1 2 3 4 5 6} {
   run_lab $n

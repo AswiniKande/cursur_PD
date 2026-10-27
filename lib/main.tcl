@@ -9,8 +9,25 @@ source [file join $::fc::root lib flow.tcl]
 source [file join $::fc::root lib reports.tcl]
 source [file join $::fc::root lib labs.tcl]
 
+# `package require` (used by `clock format`) calls ::tcl::tm::UnknownHandler,
+# which Tcl normally autoloads. Load it now so the shell's unknown handler
+# does not swallow that lookup. Other library commands still autoload.
+catch {source [file join $::tcl_library tm.tcl]}
+
 proc unknown {args} {
   set cmd [lindex $args 0]
+  if {![info exists ::auto_noload] && ![info exists ::fc::unknown_pending($cmd)]} {
+    set ::fc::unknown_pending($cmd) 1
+    set loaded 0
+    catch {set loaded [auto_load $cmd]}
+    set ready [expr {$loaded || [namespace which -command $cmd] ne ""}]
+    if {$ready} {
+      set code [catch {uplevel 1 $args} result opts]
+      unset ::fc::unknown_pending($cmd)
+      return -options $opts $result
+    }
+    unset ::fc::unknown_pending($cmd)
+  }
   ::fc::fail "unknown command '$cmd' (CMD-001). Try 'help' or 'apropos $cmd'."
 }
 
